@@ -1,154 +1,121 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+// src/contexts/TaskProvider.js
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-// Create a context for tasks
+// Create context
 const TaskContext = createContext();
 
-// Initial state for the tasks
-const initialState = {
-  tasks: [],
-  loading: false,
-  error: null,
-};
-
-// Actions
-const ADD_TASK = 'ADD_TASK';
-const REMOVE_TASK = 'REMOVE_TASK';
-const UPDATE_TASK = 'UPDATE_TASK';
-const SET_TASKS = 'SET_TASKS';
-const SET_LOADING = 'SET_LOADING';
-const SET_ERROR = 'SET_ERROR';
-
-// Reducer function to handle state updates
-const taskReducer = (state, action) => {
-  switch (action.type) {
-    case ADD_TASK:
-      return {
-        ...state,
-        tasks: [...state.tasks, action.payload],
-      };
-    case REMOVE_TASK:
-      return {
-        ...state,
-        tasks: state.tasks.filter(task => task.id !== action.payload),
-      };
-    case UPDATE_TASK:
-      return {
-        ...state,
-        tasks: state.tasks.map(task =>
-          task.id === action.payload.id ? { ...task, ...action.payload } : task
-        ),
-      };
-    case SET_TASKS:
-      return {
-        ...state,
-        tasks: action.payload,
-      };
-    case SET_LOADING:
-      return {
-        ...state,
-        loading: action.payload,
-      };
-    case SET_ERROR:
-      return {
-        ...state,
-        error: action.payload,
-      };
-    default:
-      return state;
-  }
-};
-
-// TaskProvider component
-export const TaskProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(taskReducer, initialState);
-
-  // Load tasks from localStorage on mount
+export function TaskProvider({ children }) {
+  const [tasks, setTasks] = useState([]);
+  
+  // Load tasks from localStorage on initial render
   useEffect(() => {
-    try {
-      const storedTasks = localStorage.getItem('tasks');
-      if (storedTasks) {
-        dispatch({ type: SET_TASKS, payload: JSON.parse(storedTasks) });
-      }
-    } catch (error) {
-      console.error('Failed to load tasks from localStorage:', error);
+    const savedTasks = localStorage.getItem('tasks');
+    if (savedTasks) {
+      setTasks(JSON.parse(savedTasks));
     }
   }, []);
 
-  // Save tasks to localStorage whenever they change
+  // Save tasks to localStorage whenever tasks change
   useEffect(() => {
-    try {
-      localStorage.setItem('tasks', JSON.stringify(state.tasks));
-    } catch (error) {
-      console.error('Failed to save tasks to localStorage:', error);
-    }
-  }, [state.tasks]);
+    localStorage.setItem('tasks', JSON.stringify(tasks));
+  }, [tasks]);
 
-  // Actions
-  const addTask = (task) => {
-    dispatch({
-      type: ADD_TASK,
-      payload: { ...task, id: Date.now().toString() },
-    });
+  // Get today's date as YYYY-MM-DD
+  const getTodayDateString = () => {
+    return new Date().toISOString().split('T')[0];
   };
 
-  const removeTask = (taskId) => {
-    dispatch({
-      type: REMOVE_TASK,
-      payload: taskId,
-    });
+  // Function to get tasks due today - only return tasks with today's due date
+  const getTodaysTasks = () => {
+    const today = getTodayDateString();
+    return tasks.filter(task => task.dueDate === today);
   };
 
-  const updateTask = (task) => {
-    dispatch({
-      type: UPDATE_TASK,
-      payload: task,
-    });
+  // Function to get upcoming tasks (due after today) - only return tasks with future dates
+  const getUpcomingTasks = () => {
+    const today = getTodayDateString();
+    return tasks.filter(task => 
+      task.dueDate > today && !task.completed
+    );
   };
 
-  const setTasks = (tasks) => {
-    dispatch({
-      type: SET_TASKS,
-      payload: tasks,
-    });
+  // Function to get overdue tasks - only return tasks with past dates
+  const getOverdueTasks = () => {
+    const today = getTodayDateString();
+    return tasks.filter(task => 
+      task.dueDate < today && !task.completed
+    );
   };
 
-  const setLoading = (isLoading) => {
-    dispatch({
-      type: SET_LOADING,
-      payload: isLoading,
-    });
+  // Function to calculate completion percentage for today's tasks
+  const getTodaysCompletionPercentage = () => {
+    const todaysTasks = getTodaysTasks();
+    if (todaysTasks.length === 0) return 100; // No tasks = 100% complete
+    
+    const completedCount = todaysTasks.filter(task => task.completed).length;
+    return Math.round((completedCount / todaysTasks.length) * 100);
   };
 
-  const setError = (error) => {
-    dispatch({
-      type: SET_ERROR,
-      payload: error,
-    });
+  // Function to toggle task completion with ID-only approach
+  const toggleTaskCompletion = (taskId) => {
+    setTasks(prevTasks => 
+      prevTasks.map(task => {
+        if (task.id === taskId) {
+          const now = new Date().getTime();
+          return { 
+            ...task, 
+            completed: !task.completed,
+            completedAt: !task.completed ? now : null
+          };
+        }
+        return task;
+      })
+    );
   };
 
-  // Value object with state and actions
+  // Function to add a new task
+  const addTask = (newTask) => {
+    setTasks(prevTasks => [...prevTasks, newTask]);
+  };
+
+  // Function to delete a task
+  const deleteTask = (taskId) => {
+    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+  };
+
+  // Function to update a task
+  const updateTask = (updatedTask) => {
+    setTasks(prevTasks => 
+      prevTasks.map(task => 
+        task.id === updatedTask.id ? updatedTask : task
+      )
+    );
+  };
+
   const value = {
-    tasks: state.tasks,
-    loading: state.loading,
-    error: state.error,
+    tasks,
+    getTodaysTasks,
+    getUpcomingTasks,
+    getOverdueTasks,
+    getTodaysCompletionPercentage,
+    toggleTaskCompletion,
     addTask,
-    removeTask,
-    updateTask,
-    setTasks,
-    setLoading,
-    setError,
+    deleteTask,
+    updateTask
   };
 
-  return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
-};
+  return (
+    <TaskContext.Provider value={value}>
+      {children}
+    </TaskContext.Provider>
+  );
+}
 
 // Custom hook to use the task context
-export const useTasks = () => {
+export function useTasks() {
   const context = useContext(TaskContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useTasks must be used within a TaskProvider');
   }
   return context;
-};
-
-export default TaskProvider;
+}
