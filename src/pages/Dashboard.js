@@ -2,7 +2,7 @@
 import React, { useContext, useMemo, useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 import { UserContext } from '../App';
-import { useTasks } from '../contexts/TaskProvider';  // Updated import
+import { useTasks } from '../contexts/TaskProvider'; 
 import ProgressBar from '../components/ProgressBar';
 import TaskItem from '../components/TaskItem';
 import '../styles/Dashboard.css';
@@ -18,10 +18,11 @@ function Dashboard() {
     toggleTaskCompletion 
   } = useTasks();
   
-  const todaysTasks = getTodaysTasks();
-  const upcomingTasks = getUpcomingTasks();
-  const overdueTasks = getOverdueTasks();
-  const completionPercentage = getTodaysCompletionPercentage();
+  // Get tasks directly from the TaskProvider
+  const todaysTasks = useMemo(() => getTodaysTasks(), [tasks]); // React to changes in tasks
+  const upcomingTasks = useMemo(() => getUpcomingTasks(), [tasks]);
+  const overdueTasks = useMemo(() => getOverdueTasks(), [tasks]);
+  const completionPercentage = useMemo(() => getTodaysCompletionPercentage(), [tasks]);
   
   // Track statistics
   const [stats, setStats] = useState({
@@ -33,7 +34,7 @@ function Dashboard() {
   // Get today's date as YYYY-MM-DD
   const today = new Date().toISOString().split('T')[0];
   
-  // Group overdue tasks by date
+  // Group overdue tasks by date - using useMemo to only recalculate when overdueTasks change
   const overdueTasksByDate = useMemo(() => {
     const groupedTasks = {};
     
@@ -78,8 +79,9 @@ function Dashboard() {
     });
   }, [tasks]);
   
-  // Custom toggle handler to make sure stats update properly
+  // Custom toggle handler with debugging
   const handleToggleCompletion = (taskId) => {
+    console.log(`Toggling task with ID: ${taskId}`);
     toggleTaskCompletion(taskId);
   };
 

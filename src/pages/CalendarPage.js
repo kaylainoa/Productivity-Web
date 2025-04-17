@@ -1,6 +1,6 @@
 // src/pages/CalendarPage.js
 import React from 'react';
-import useTasks from '../hooks/useTasks';
+import { useTasks } from '../contexts/TaskProvider';
 import '../styles/Calendar.css';
 
 function CalendarPage() {

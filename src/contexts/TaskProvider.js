@@ -5,33 +5,43 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const TaskContext = createContext();
 
 export function TaskProvider({ children }) {
-  const [tasks, setTasks] = useState([]);
-  
-  // Load tasks from localStorage on initial render
-  useEffect(() => {
+  // Initialize with empty tasks array instead of sample tasks
+  const [tasks, setTasks] = useState(() => {
     const savedTasks = localStorage.getItem('tasks');
     if (savedTasks) {
-      setTasks(JSON.parse(savedTasks));
+      try {
+        const parsedTasks = JSON.parse(savedTasks);
+        // Validate that we have an array of tasks
+        if (Array.isArray(parsedTasks)) {
+          return parsedTasks;
+        }
+        console.warn("Invalid tasks data found in localStorage, using empty array");
+        return [];
+      } catch (error) {
+        console.error("Error parsing tasks from localStorage:", error);
+        return [];
+      }
     }
-  }, []);
-
+    return []; // Start with empty array instead of initial sample tasks
+  });
+  
   // Save tasks to localStorage whenever tasks change
   useEffect(() => {
     localStorage.setItem('tasks', JSON.stringify(tasks));
   }, [tasks]);
-
+  
   // Get today's date as YYYY-MM-DD
   const getTodayDateString = () => {
     return new Date().toISOString().split('T')[0];
   };
 
-  // Function to get tasks due today - only return tasks with today's due date
+  // Function to get tasks due today
   const getTodaysTasks = () => {
     const today = getTodayDateString();
     return tasks.filter(task => task.dueDate === today);
   };
 
-  // Function to get upcoming tasks (due after today) - only return tasks with future dates
+  // Function to get upcoming tasks
   const getUpcomingTasks = () => {
     const today = getTodayDateString();
     return tasks.filter(task => 
@@ -39,7 +49,7 @@ export function TaskProvider({ children }) {
     );
   };
 
-  // Function to get overdue tasks - only return tasks with past dates
+  // Function to get overdue tasks
   const getOverdueTasks = () => {
     const today = getTodayDateString();
     return tasks.filter(task => 
@@ -47,35 +57,52 @@ export function TaskProvider({ children }) {
     );
   };
 
-  // Function to calculate completion percentage for today's tasks
+  // Function to calculate completion percentage
   const getTodaysCompletionPercentage = () => {
     const todaysTasks = getTodaysTasks();
-    if (todaysTasks.length === 0) return 100; // No tasks = 100% complete
+    if (todaysTasks.length === 0) return 100;
     
     const completedCount = todaysTasks.filter(task => task.completed).length;
     return Math.round((completedCount / todaysTasks.length) * 100);
   };
 
-  // Function to toggle task completion with ID-only approach
+  // Function to toggle task completion
   const toggleTaskCompletion = (taskId) => {
-    setTasks(prevTasks => 
-      prevTasks.map(task => {
-        if (task.id === taskId) {
-          const now = new Date().getTime();
-          return { 
-            ...task, 
-            completed: !task.completed,
-            completedAt: !task.completed ? now : null
-          };
-        }
-        return task;
-      })
-    );
+    console.log(`Provider toggling task with ID: ${taskId}`);
+    
+    setTasks(prevTasks => {
+      // Find the task by ID
+      const taskIndex = prevTasks.findIndex(task => task.id === taskId);
+      
+      if (taskIndex === -1) {
+        console.error(`Task with ID ${taskId} not found`);
+        return prevTasks;
+      }
+      
+      // Create a new array with the updated task
+      const updatedTasks = [...prevTasks];
+      const task = updatedTasks[taskIndex];
+      
+      updatedTasks[taskIndex] = {
+        ...task,
+        completed: !task.completed,
+        completedAt: !task.completed ? Date.now() : null
+      };
+      
+      return updatedTasks;
+    });
   };
 
-  // Function to add a new task
+  // Function to add a new task with unique ID
   const addTask = (newTask) => {
-    setTasks(prevTasks => [...prevTasks, newTask]);
+    const taskWithId = {
+      ...newTask,
+      id: Date.now(), // Ensure unique ID using timestamp
+      completed: false,
+      completedAt: null
+    };
+    
+    setTasks(prevTasks => [...prevTasks, taskWithId]);
   };
 
   // Function to delete a task
