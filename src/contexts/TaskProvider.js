@@ -1,34 +1,90 @@
 // src/contexts/TaskProvider.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db, auth } from '../Firebase';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  serverTimestamp, 
+  onSnapshot,
+  orderBy
+} from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 // Create context
 const TaskContext = createContext();
 
 export function TaskProvider({ children }) {
-  // Initialize with empty tasks array instead of sample tasks
-  const [tasks, setTasks] = useState(() => {
-    const savedTasks = localStorage.getItem('tasks');
-    if (savedTasks) {
-      try {
-        const parsedTasks = JSON.parse(savedTasks);
-        // Validate that we have an array of tasks
-        if (Array.isArray(parsedTasks)) {
-          return parsedTasks;
-        }
-        console.warn("Invalid tasks data found in localStorage, using empty array");
-        return [];
-      } catch (error) {
-        console.error("Error parsing tasks from localStorage:", error);
-        return [];
-      }
-    }
-    return []; // Start with empty array instead of initial sample tasks
-  });
-  
-  // Save tasks to localStorage whenever tasks change
+  const [tasks, setTasks] = useState([]);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Listen for authentication state changes
   useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-  }, [tasks]);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("Auth state changed:", currentUser ? currentUser.uid : "no user");
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch tasks when user authentication state changes
+  useEffect(() => {
+    let unsubscribe = () => {};
+    
+    const fetchTasks = async () => {
+      if (!user) {
+        setTasks([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        console.log("Setting up task listener for user:", user.uid);
+        // Create a query for the current user's tasks
+        const tasksQuery = query(
+          collection(db, 'tasks'),
+          where('userId', '==', user.uid)
+          // Note: Removed orderBy as it requires a composite index
+        );
+        
+        // Set up a real-time listener
+        unsubscribe = onSnapshot(tasksQuery, (snapshot) => {
+          console.log("Received task update, document count:", snapshot.docs.length);
+          const userTasks = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setTasks(userTasks);
+          setLoading(false);
+        }, (error) => {
+          console.error("Error listening for task updates:", error);
+          setLoading(false);
+        });
+        
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchTasks();
+    } else {
+      setTasks([]);
+      setLoading(false);
+    }
+    
+    // Clean up the subscription
+    return () => unsubscribe();
+  }, [user]);
   
   // Get today's date as YYYY-MM-DD
   const getTodayDateString = () => {
@@ -57,6 +113,14 @@ export function TaskProvider({ children }) {
     );
   };
 
+  // Function to search tasks
+  const searchTasks = (query) => {
+    const lowerCaseQuery = query.toLowerCase();
+    return tasks.filter(task => 
+      task.title.toLowerCase().includes(lowerCaseQuery)
+    );
+  };
+
   // Function to calculate completion percentage
   const getTodaysCompletionPercentage = () => {
     const todaysTasks = getTodaysTasks();
@@ -67,60 +131,119 @@ export function TaskProvider({ children }) {
   };
 
   // Function to toggle task completion
-  const toggleTaskCompletion = (taskId) => {
-    console.log(`Provider toggling task with ID: ${taskId}`);
+  const toggleTaskCompletion = async (taskId) => {
+    if (!user) {
+      console.warn("Cannot toggle task: No authenticated user");
+      return;
+    }
     
-    setTasks(prevTasks => {
-      // Find the task by ID
-      const taskIndex = prevTasks.findIndex(task => task.id === taskId);
-      
-      if (taskIndex === -1) {
+    try {
+      // Find the task in the current state
+      const taskToUpdate = tasks.find(task => task.id === taskId);
+      if (!taskToUpdate) {
         console.error(`Task with ID ${taskId} not found`);
-        return prevTasks;
+        return;
       }
       
-      // Create a new array with the updated task
-      const updatedTasks = [...prevTasks];
-      const task = updatedTasks[taskIndex];
+      console.log("Toggling completion for task:", taskId);
       
-      updatedTasks[taskIndex] = {
-        ...task,
-        completed: !task.completed,
-        completedAt: !task.completed ? Date.now() : null
-      };
+      // Update the task in Firestore
+      const taskRef = doc(db, 'tasks', taskId);
+      await updateDoc(taskRef, {
+        completed: !taskToUpdate.completed,
+        completedAt: !taskToUpdate.completed ? new Date().toISOString() : null
+        // Note: Removed serverTimestamp() as it may cause issues
+      });
       
-      return updatedTasks;
-    });
+    } catch (error) {
+      console.error("Error toggling task completion:", error);
+    }
   };
 
-  // Function to add a new task with unique ID
-  const addTask = (newTask) => {
-    const taskWithId = {
-      ...newTask,
-      id: Date.now(), // Ensure unique ID using timestamp
-      completed: false,
-      completedAt: null
-    };
+  // Function to add a new task
+  const addTask = async (newTask) => {
+    if (!user) {
+      console.warn("Cannot add task: No authenticated user");
+      return false;
+    }
     
-    setTasks(prevTasks => [...prevTasks, taskWithId]);
+    if (!newTask.title || !newTask.title.trim()) {
+      console.warn("Cannot add task: Empty title");
+      return false;
+    }
+    
+    try {
+      console.log("Adding new task for user:", user.uid);
+      
+      // Add task to Firestore
+      const taskData = {
+        userId: user.uid,
+        title: newTask.title.trim(),
+        dueDate: newTask.dueDate || getTodayDateString(),
+        urgency: newTask.urgency !== undefined ? newTask.urgency : 0,
+        completed: false,
+        completedAt: null,
+        createdAt: new Date().toISOString() // Use ISO string instead of serverTimestamp
+      };
+      
+      console.log("Task data to add:", taskData);
+      
+      const docRef = await addDoc(collection(db, 'tasks'), taskData);
+      console.log("Task added with ID:", docRef.id);
+      
+      return true; // Indicate success
+    } catch (error) {
+      console.error("Error adding task:", error);
+      return false;
+    }
   };
 
   // Function to delete a task
-  const deleteTask = (taskId) => {
-    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+  const deleteTask = async (taskId) => {
+    if (!user) {
+      console.warn("Cannot delete task: No authenticated user");
+      return;
+    }
+    
+    try {
+      console.log("Deleting task:", taskId);
+      
+      // Delete the task from Firestore
+      const taskRef = doc(db, 'tasks', taskId);
+      await deleteDoc(taskRef);
+      
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
   };
 
   // Function to update a task
-  const updateTask = (updatedTask) => {
-    setTasks(prevTasks => 
-      prevTasks.map(task => 
-        task.id === updatedTask.id ? updatedTask : task
-      )
-    );
+  const updateTask = async (updatedTask) => {
+    if (!user) {
+      console.warn("Cannot update task: No authenticated user");
+      return;
+    }
+    
+    try {
+      console.log("Updating task:", updatedTask.id);
+      
+      // Update the task in Firestore
+      const taskRef = doc(db, 'tasks', updatedTask.id);
+      
+      // Remove the id from the data to update
+      const { id, ...dataToUpdate } = updatedTask;
+      
+      await updateDoc(taskRef, dataToUpdate);
+      
+    } catch (error) {
+      console.error("Error updating task:", error);
+    }
   };
 
   const value = {
     tasks,
+    loading,
+    user,
     getTodaysTasks,
     getUpcomingTasks,
     getOverdueTasks,
@@ -128,7 +251,8 @@ export function TaskProvider({ children }) {
     toggleTaskCompletion,
     addTask,
     deleteTask,
-    updateTask
+    updateTask,
+    searchTasks
   };
 
   return (
