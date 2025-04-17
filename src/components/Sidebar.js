@@ -1,6 +1,6 @@
 // src/components/Sidebar.js
 import React, { useContext } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Calendar, CheckSquare, Home, LogOut } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { UserContext } from '../App'; // Make sure to create this context in App.js
@@ -9,6 +9,7 @@ import '../styles/Sidebar.css';
 function Sidebar() {
   const { user } = useContext(UserContext);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     const auth = getAuth();

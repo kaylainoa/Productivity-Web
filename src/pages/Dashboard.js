@@ -15,7 +15,8 @@ function Dashboard() {
     getUpcomingTasks,
     getOverdueTasks,
     getTodaysCompletionPercentage,
-    toggleTaskCompletion 
+    toggleTaskCompletion,
+    deleteTask  // Import deleteTask function
   } = useTasks();
   
   // Get tasks directly from the TaskProvider
@@ -85,6 +86,12 @@ function Dashboard() {
     toggleTaskCompletion(taskId);
   };
 
+  // Custom delete handler with debugging
+  const handleDeleteTask = (taskId) => {
+    console.log(`Dashboard deleting task with ID: ${taskId}`);
+    deleteTask(taskId);
+  };
+
   // Format date to display
   const formatDate = (dateString) => {
     const taskDate = new Date(dateString);
@@ -121,7 +128,7 @@ function Dashboard() {
                     <TaskItem 
                       task={task}
                       onToggleComplete={handleToggleCompletion}
-                      onDelete={() => {}} // No delete option in dashboard
+                      onDelete={handleDeleteTask} // Use the explicit handler
                     />
                   </li>
                 ))}
@@ -145,7 +152,7 @@ function Dashboard() {
                     <TaskItem 
                       task={task}
                       onToggleComplete={handleToggleCompletion}
-                      onDelete={() => {}} // No delete option in dashboard
+                      onDelete={handleDeleteTask} // Use the explicit handler
                     />
                   </li>
                 ))}
@@ -165,7 +172,7 @@ function Dashboard() {
                   <TaskItem 
                     task={task}
                     onToggleComplete={handleToggleCompletion}
-                    onDelete={() => {}} // No delete option in dashboard
+                    onDelete={handleDeleteTask} // Use the explicit handler
                   />
                 </li>
               ))}
