@@ -8,11 +8,15 @@ import CalendarPage from './pages/CalendarPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import Sidebar from './components/Sidebar';
+import AddTaskFAB from './components/AddTaskFAB';
 import { TaskProvider } from './contexts/TaskProvider';
 import './styles/App.css';
 
 // Create user context for Firebase auth
 export const UserContext = createContext(null);
+
+// Create Firebase tasks context
+export const FirebaseTasksContext = createContext(null);
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -46,6 +50,7 @@ function App() {
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
+                <AddTaskFAB />
               </main>
             </div>
           ) : (
