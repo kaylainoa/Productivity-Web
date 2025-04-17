@@ -2,7 +2,7 @@
 import React, { useContext, useMemo, useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 import { UserContext } from '../App';
-import useTasks from '../hooks/useTasks';
+import { useTasks } from '../contexts/TaskProvider';  // Updated import
 import ProgressBar from '../components/ProgressBar';
 import TaskItem from '../components/TaskItem';
 import '../styles/Dashboard.css';

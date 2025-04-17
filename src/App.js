@@ -1,4 +1,4 @@
-// src/App.js - Updated version
+// src/App.js
 import React, { useState, useEffect, createContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -8,6 +8,7 @@ import CalendarPage from './pages/CalendarPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import Sidebar from './components/Sidebar';
+import { TaskProvider } from './contexts/TaskProvider';
 import './styles/App.css';
 
 // Create user context for Firebase auth
@@ -33,27 +34,29 @@ function App() {
 
   return (
     <UserContext.Provider value={{ user: currentUser }}>
-      <Router>
-        {currentUser ? (
-          <div className="app-container">
-            <Sidebar />
-            <main className="app-main-content">
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/tasks" element={<TasksPage />} />
-                <Route path="/calendar" element={<CalendarPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
-          </div>
-        ) : (
-          <Routes>
-            <Route path="/" element={<LoginPage />} />
-            <Route path="/signup" element={<SignUpPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        )}
-      </Router>
+      <TaskProvider>
+        <Router>
+          {currentUser ? (
+            <div className="app-container">
+              <Sidebar />
+              <main className="app-main-content">
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/tasks" element={<TasksPage />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </main>
+            </div>
+          ) : (
+            <Routes>
+              <Route path="/" element={<LoginPage />} />
+              <Route path="/signup" element={<SignUpPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          )}
+        </Router>
+      </TaskProvider>
     </UserContext.Provider>
   );
 }

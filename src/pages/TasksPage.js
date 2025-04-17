@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Search, Plus } from 'lucide-react';
 import TaskItem from '../components/TaskItem';
-import useTasks from '../hooks/useTasks';
+import { useTasks } from '../contexts/TaskProvider';  // Updated import
 import '../styles/Tasks.css';
 
 function TasksPage() {
@@ -10,7 +10,8 @@ function TasksPage() {
     tasks, 
     addTask, 
     toggleTaskCompletion, 
-    deleteTask 
+    deleteTask,
+    searchTasks 
   } = useTasks();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,9 +39,7 @@ function TasksPage() {
   };
 
   // Filter tasks based on search query
-  const filteredTasks = tasks.filter(task => 
-    task.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTasks = searchQuery ? searchTasks(searchQuery) : tasks;
 
   const activeTasks = filteredTasks.filter(task => !task.completed);
   const completedTasks = filteredTasks.filter(task => task.completed);
