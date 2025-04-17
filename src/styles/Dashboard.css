@@ -173,6 +173,7 @@
   .dashboard-overdue {
     border-left: 4px solid #f44336;
     background-color: rgba(244, 67, 54, 0.05);
+    margin-bottom: 1.5rem;
   }
   
   .dashboard-stat-overdue {
